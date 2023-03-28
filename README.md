@@ -1,7 +1,7 @@
 # alphahull: Generalization of the Convex Hull of a Sample of Points in the Plane
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![](https://www.r-pkg.org/badges/version/alphahull?color=green)](https://cran.r-project.org/package=alphahull)
 [![](http://cranlogs.r-pkg.org/badges/grand-total/alphahull?color=green)](https://cran.r-project.org/package=alphahull)
 [![](http://cranlogs.r-pkg.org/badges/last-month/alphahull?color=green)](https://cran.r-project.org/package=alphahull)
