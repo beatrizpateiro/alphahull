@@ -28,7 +28,7 @@ Alternatively, get the latest version from GitHub:
 ``` r
 # Install the package
 library(devtools)
-install_github("beatriz.pateiro/alphahull")
+install_github("beatrizpateiro/alphahull")
 
 # Load package
 library(alphahull)
