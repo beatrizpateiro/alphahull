@@ -2,8 +2,6 @@
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![R build
-status](https://github.com/beatrizpateiro/alphahull/workflows/R-CMD-check/badge.svg)](https://github.com/beatrizpateiro/alphahull/actions)
 [![](https://www.r-pkg.org/badges/version/alphahull?color=green)](https://cran.r-project.org/package=alphahull)
 [![](http://cranlogs.r-pkg.org/badges/grand-total/alphahull?color=green)](https://cran.r-project.org/package=alphahull)
 [![](http://cranlogs.r-pkg.org/badges/last-month/alphahull?color=green)](https://cran.r-project.org/package=alphahull)
