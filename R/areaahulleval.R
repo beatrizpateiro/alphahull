@@ -1,7 +1,18 @@
+#' Area of the alpha-convex hull
+#'
+#' This function calculates the area of the \eqn{\alpha}-convex hull of a
+#' sample of points.
+#'
+#'
+#' @param x Object of class \code{"ahull"}.
+#' @return \item{area}{Area of the \eqn{\alpha}-convex hull. }
+#' @seealso \code{\link{ahull}}.
+#' @keywords internal
+#' @export areaahulleval
 areaahulleval <-
-function (x) 
+function (x)
 {
-    if (class(x) != "ahull") {
+    if (!inherits(x,"ahull")) {
         cat("Argument is not of class ahull.\n")
         return(invisible())
     }
@@ -17,9 +28,9 @@ function (x)
         posigual <- which(aa[miropos] == aa)
         posigual <- posigual[posigual != miropos]
         if (posigual%/%2 == posigual/2) {
-            nuevoa[newpos:(newpos + 1)] <- aa[posigual:(posigual - 
+            nuevoa[newpos:(newpos + 1)] <- aa[posigual:(posigual -
                 1)]
-            nuevoa[posigual:(posigual - 1)] <- aa[newpos:(newpos + 
+            nuevoa[posigual:(posigual - 1)] <- aa[newpos:(newpos +
                 1)]
             filan <- posigual/2
             filold <- newpos%/%2 + 1
@@ -29,9 +40,9 @@ function (x)
             arcsah[filold, ] <- filan2
         }
         else {
-            nuevoa[newpos:(newpos + 1)] <- aa[posigual:(posigual + 
+            nuevoa[newpos:(newpos + 1)] <- aa[posigual:(posigual +
                 1)]
-            nuevoa[posigual:(posigual + 1)] <- aa[newpos:(newpos + 
+            nuevoa[posigual:(posigual + 1)] <- aa[newpos:(newpos +
                 1)]
             filan <- posigual%/%2 + 1
             filold <- newpos%/%2 + 1
@@ -67,16 +78,16 @@ function (x)
             polyind <- unique(as.numeric(ind[compind, ]))
             polypoints <- x$xahull[polyind, ]
             check <- which(arcs[compind, 6] < pi * 0.5)[1]
-            if (in.polygon(arcs[compind, 1][check], arcs[compind, 
+            if (sgeostat::in.polygon(arcs[compind, 1][check], arcs[compind,
                 2][check], polypoints[, 1], polypoints[, 2])) {
                 hole[i] <- 1
             }
-            areapoly <- areapl(polypoints)
-            areacirc <- arcs[compind, 3]^2 * 0.5 * (2 * arcs[compind, 
+            areapoly <- splancs::areapl(polypoints)
+            areacirc <- arcs[compind, 3]^2 * 0.5 * (2 * arcs[compind,
                 6] - sin(2 * arcs[compind, 6]))
             area[i] <- areapoly + hole[i] * sum(areacirc)
         }
-        totalarea <- sum(area[hole == -1]) - sum(area[hole == 
+        totalarea <- sum(area[hole == -1]) - sum(area[hole ==
             1])
     }
     else {
