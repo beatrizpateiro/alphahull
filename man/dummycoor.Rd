@@ -1,26 +1,44 @@
 \name{dummycoor}
 \alias{dummycoor}
-%- Also NEED an '\alias' for EACH other topic documented here.
-\title{Semi-infinite edge of the Voronoi diagram}
+\title{Fictitious endpoint of a semi-infinite Voronoi edge}
 \description{
-   This function determines fictitious coordinates for the boundless extreme of a semi-infinite edge of the Voronoi diagram.
+   Computes a fictitious endpoint in the outward direction of a
+   semi-infinite Voronoi edge, for plotting purposes.
 }
 \usage{
 dummycoor(tri.obj, l1, l2, m, away)
 }
-%- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{tri.obj}{Object of class \code{"triSht"}. See \code{\link[interp]{tri.mesh}} in package \pkg{interp}.}
-  \item{l1}{ Index of the sample point correponding to one vertex of a triangle of Delaunay that lies on the convex hull, see Details.}
-  \item{l2}{ Index of the sample point correponding to other vertex of a triangle of Delaunay that lies on the convex hull, see Details.}
-  \item{m}{ Index of the circumcenter of the triangle of Delaunay with one edge on the convex hull.}
-  \item{away}{ Constant that determines how far away the fictitious boundless extreme is located.}
+  \item{tri.obj}{Sample coordinates as a two-column matrix or as a list
+    with numeric components \code{x} and \code{y}.}
+  \item{l1}{Numeric vector of length two containing the coordinates of
+    the first endpoint of a Delaunay edge on the convex hull.}
+  \item{l2}{Numeric vector of length two containing the coordinates of
+    the second endpoint of that Delaunay edge.}
+  \item{m}{Numeric vector of length two containing the circumcentre
+    of the adjacent Delaunay triangle.}
+  \item{away}{Positive numeric distance used to place the fictitious
+    endpoint along the outward ray.}
 }
 \details{
-   When a triangle of the Delaunay triangulation has one of its edges (given by the segment that joins the sample points with indexes \code{l1} and \code{l2}) on the convex hull, the corresponding segment of the Voronoi diagram is semi-infinite. The finite extreme coincides with the circumcenter of the triangle and the direction of the line is given by the perpendicular bisector of the edge that lies on the convex hull. 
+   A Delaunay edge on the convex hull corresponds to a semi-infinite
+   Voronoi edge whose finite endpoint is the circumcentre \code{m}.
+   The direction is perpendicular to the Delaunay edge joining
+   \code{l1} and \code{l2}. The outward orientation is selected using
+   the centroid of the sample coordinates in \code{tri.obj}.
+
+   The fictitious endpoint is placed along the ray at a distance
+   depending on \code{away} and the projection of the Delaunay edge
+   midpoint. This ensures that the plotting endpoint extends beyond
+   that projection. The returned point is not an actual Voronoi vertex.
 }
 \value{
-  \item{dum}{Fictitious coordinates of the boundless extreme.}
+   A numeric vector of length two giving the fictitious endpoint
+   of the semi-infinite Voronoi ray.
 }
 \seealso{ \code{\link{delvor}}.}
+\examples{
+xy <- rbind(c(0, 0), c(1, 0), c(0, 1))
+dummycoor(xy, c(0, 0), c(1, 0), c(0.5, 0.5), away = 2)
+}
 \keyword{nonparametric}
