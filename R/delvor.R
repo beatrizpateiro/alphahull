@@ -15,7 +15,11 @@ delvor <- function(x, y = NULL)
         tri <- matrix(1:3, nrow = 1L)
     }
     else {
-        tri <- geometry::delaunayn(x)
+        # Center coordinates to improve numerical stability
+        xcentered <- sweep(x, 2L, colMeans(x), "-")
+
+        # Delaunay triangulation using centered coordinates
+        tri <- geometry::delaunayn(xcentered)
     }
     tri <- matrix(as.integer(tri), ncol = 3L)
     if (nrow(tri) == 0L) {
