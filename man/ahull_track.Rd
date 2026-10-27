@@ -30,28 +30,32 @@ Wikelski, M., and Kays, R. (2014). Movebank: archive, analysis and sharing of an
 }
 \examples{
 \dontrun{
-library(move)
-library(ggmap)
 # Data from Movebank
-# Study Name: Dunn Ranch Bison Tracking Project
-# Principal Investigator: Stephen Blake, Randy Arndt, Doug Ladd
-# Max Planck Institute for Ornithology Radolfzell Germany
-study <- "Dunn Ranch Bison Tracking Project" 
-cainfo <- system.file("CurlSSL", "cacert.pem", package = "RCurl")
-options(RCurlOptions = list(verbose = FALSE, capath = cainfo, ssl.verifypeer = FALSE))
-# Login to movebank (first create the login object) 
-curl <- movebankLogin(username = "xxx", password = "zzz") 
-# Downloads study stored in Movebank
-track <- getMovebankData(study = study, login = curl) 
-dat <- track@data[track@data[, "deployment_id"] == 13848432,]
-# Map of animal locations 
-bbox <- ggmap::make_bbox(dat[,"location_long"], dat[,"location_lat"], f = 0.3) 
-map_loc <- get_map(location = bbox, source = "google", maptype = 'satellite')  
-map <- ggmap(map_loc, extent = 'panel', maprange=FALSE) 
-p <- map + geom_path(data = dat, aes(x = location_long, y = location_lat), col=2, size=0.3)
+# Study Name: Missouri Bison Tracking Project
+# Principal Investigator: Stephen Blake
+library(move)
+# Login to Movebank (requires a Movebank account)
+curl <- movebankLogin(username = "xxx", password = "zzz")
+# Download study data (requires agreed to the license terms in the web interface)
+study <- "Missouri Bison Tracking Project"
+animalName <-"AHP2059"
+track <- getMovebankData(study = study, animalName = animalName, login = curl)
+dat <- track@data
+# Plot animal locations
+p <- ggplot2::ggplot(
+  dat,
+  ggplot2::aes(x = location_long, y = location_lat)
+) +
+  ggplot2::geom_path(
+    colour = "red",
+    linewidth = 0.3
+  ) +
+  ggplot2::coord_quickmap()
 p
-ah_gp <- ahull_track(x = dat[, c("location_long", "location_lat")], alpha = 0.005)
-p + ah_gp
+# Alpha-convex hull of the animal trajectory
+ah_out <- ahull_track(x = dat[, c("location_long", "location_lat")], alpha = 0.005)
+# Plot the trajectory and the alpha-convex hull
+p + ah_out
 }
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
