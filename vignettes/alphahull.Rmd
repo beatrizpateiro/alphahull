@@ -1,6 +1,6 @@
 ---
 title: "Generalizing the Convex Hull of a Sample: The R Package alphahull"
-subtitle: "Updated for alphahull 3.0.0"
+subtitle: "Updated for alphahull 3.0.1"
 author:
   - "Beatriz Pateiro-López"
   - "Alberto Rodríguez-Casal"
@@ -159,7 +159,7 @@ plot(delvor(x),col=1:3,xlab="",ylab="",add=TRUE)
 From the computational viewpoint, efficient methods for the computation of Delaunay triangulations and Voronoi diagrams have been developed. [@Auren00] presented a review of algorithms, from the earliest intuitive methods to more efficient representations of these geometric structures. For example, the incremental insertion process by [@Green78], the Divide and Conquer method by [@Shamos75] or the plane-sweep technique by [@Fortune87] are the basis of a large class of worst-case optimal algorithms for computing the whole Voronoi diagram in the plane. Of course, these techniques can also be applied to the computation
 of the Delaunay triangulation. See for example the efficient incremental algorithm by [@Lawson77]. Both the Voronoi diagram and the Delaunay triangulation of $n$ points can be computed in $O(n\log n)$ time and linear space. Furthermore, by the duality between the Voronoi diagram and the Delaunay triangulation, either tessellation is easily obtained from a representation of the other in $O(n)$ time.
 
-Currently, there are several libraries available in R that compute the Delaunay triangulation or the Voronoi diagram of a given set of points. See the packages `deldir` by [@deldir] or `geometry` by [@geometry], among others. These libraries differ on the implemented algorithms and the data structures that store the information. For example, the package `deldir` computes the Delaunay triangulation and the Voronoi diagram of a planar point set according to the second iterative algorithm of [@Lee80]. Unfortunately, this package does not return the kind of data structure we need in order to compute the $\alpha$-shape and the $\alpha$-convex hull. The function `deldir` computes the triangulation of a set of points enclosed in a finite rectangular window.  In consequence, the endpoints of the Voronoi edges outside that window are discarded. This fact does not appear to be a problem unless we need to know all the Voronoi edges, as in our case. Note that, in principle, the location of the furthest Voronoi vertex is unknown and enlarging the window size to ensure that the information is complete has a considerable computational cost.  Our package \pkg{alphahull} computes the Delaunay triangulation
+Currently, there are several libraries available in R that compute the Delaunay triangulation or the Voronoi diagram of a given set of points. See the packages `deldir` by [@deldir] or `geometry` by [@geometry], among others. These libraries differ on the implemented algorithms and the data structures that store the information. For example, the package `deldir` computes the Delaunay triangulation and the Voronoi diagram of a planar point set according to the second iterative algorithm of [@Lee80]. Unfortunately, this package does not return the kind of data structure we need in order to compute the $\alpha$-shape and the $\alpha$-convex hull. The function `deldir` computes the triangulation of a set of points enclosed in a finite rectangular window.  In consequence, the endpoints of the Voronoi edges outside that window are discarded. This fact does not appear to be a problem unless we need to know all the Voronoi edges, as in our case. Note that, in principle, the location of the furthest Voronoi vertex is unknown and enlarging the window size to ensure that the information is complete has a considerable computational cost.  Our package `alphahull` computes the Delaunay triangulation
 and the Voronoi diagram with respect to the whole plane.
 For each edge of the Delaunay triangulation, the corresponding
 segment in the Voronoi diagram is obtained by connecting the
@@ -169,7 +169,7 @@ lie on the boundary of the convex hull, the corresponding
 Voronoi edges are semi-infinite.
 
 The Delaunay triangulation is computed using the function
-\code{delaunayn} from package \pkg{geometry}. The corresponding
+`delaunayn` from package `geometry`. The corresponding
 Voronoi diagram is constructed directly from the Delaunay
 triangulation by computing the circumcentres of the triangles
 and identifying their adjacency relationships. This approach
@@ -177,33 +177,33 @@ allows us to obtain the primal and dual geometric structures
 without restricting the computation to a finite rectangular
 window.
 
-The output of the function \code{delvor} is a list with three
-components. The first component, \code{mesh}, stores the primal
+The output of the function `delvor` is a list with three
+components. The first component, `mesh`, stores the primal
 and dual information. For each edge of the Delaunay
-triangulation, \code{mesh} contains the indices \code{ind1},
-\code{ind2} and the coordinates (\code{x1}, \code{y1}),
-(\code{x2}, \code{y2}) of the sample points that form the edge,
+triangulation, `mesh` contains the indices `ind1`,
+`ind2` and the coordinates (`x1`, `y1`),
+(`x2`, `y2`) of the sample points that form the edge,
 the coordinates of the endpoints of the corresponding segment
-in the Voronoi diagram (\code{mx1}, \code{my1}),
-(\code{mx2}, \code{my2}), and indicators identifying the
+in the Voronoi diagram (`mx1`, `my1`),
+(`mx2`, `my2`), and indicators identifying the
 endpoints of Voronoi edges that represent unbounded extremes.
-Specifically, \code{bp1 = 1} if (\code{mx1}, \code{my1}) is a
-dummy node, and similarly for \code{bp2}.
+Specifically, `bp1 = 1` if (`mx1`, `my1`) is a
+dummy node, and similarly for `bp2`.
 
-The second component, \code{x}, stores the sample points.
-The third component, \code{tri.obj}, contains the Delaunay
+The second component, `x`, stores the sample points.
+The third component, `tri.obj`, contains the Delaunay
 triangulation and associated geometric information, including
 triangle vertices, adjacency relationships, circumcircle
 information, and convex hull indices. Although the
-triangulation is now computed using \pkg{geometry}, this
+triangulation is now computed using `geometry`, this
 component retains a structure compatible with the
-\code{triSht} objects previously returned by \pkg{interp},
+`triSht` objects previously returned by `interp`,
 in order to preserve backward compatibility with existing
 code and dependent packages.
 
-As an illustration, we have applied the function \code{delvor}
+As an illustration, we have applied the function `delvor`
 to a given set of $n=5$ points. The result is assigned to the
-object \code{dv} and printed out.
+object `dv` and printed out.
 
 ```{r chunk-5}
 x <- c(0.905, 0.606, 0.458, 0.988, 0.744)
