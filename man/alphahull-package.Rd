@@ -10,7 +10,7 @@ Computation of the \eqn{\alpha}-shape and \eqn{\alpha}-convex hull of a given sa
 \tabular{ll}{
 Package: \tab alphahull\cr
 Type: \tab Package\cr
-Version: \tab 3.0.0\cr
+Version: \tab 3.0.1\cr
 Date: \tab 2026-10-29\cr
 License: \tab R functions: 	GPL-2 | GPL-3
 \cr

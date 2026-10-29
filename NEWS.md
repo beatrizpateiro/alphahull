@@ -1,4 +1,4 @@
-# alphahull 3.0.0
+# alphahull 3.0.1
 
 - Replaced the `interp` triangulation with `geometry::delaunayn` (Qhull) in `delvor()`. Delaunay edge adjacencies and Voronoi edges now come from the same triangulation, with a convex-hull consistency check.
 - Oriented unbounded Voronoi rays using the sample centroid and extended their   finite plotting markers beyond the midpoint projection when necessary.
