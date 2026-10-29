@@ -62,6 +62,8 @@ delvor <- function(x, y = NULL)
     lo <- lo[ord]
     hi <- hi[ord]
     triangle.id <- triangle.id[ord]
+    # Identify the vertex opposite each triangle edge
+    side.id <- rep(c(3L, 1L, 2L), each = nt)[ord] 
     first <- c(TRUE, lo[-1L] != lo[-length(lo)] |
                          hi[-1L] != hi[-length(hi)])
     start <- which(first)
@@ -114,8 +116,90 @@ delvor <- function(x, y = NULL)
     colnames(mesh) <- c("ind1", "ind2", "x1", "y1", "x2", "y2",
                         "mx1", "my1", "mx2", "my2", "bp1", "bp2")
 
-    # Documented change: tri.obj is now a triangle index matrix.
-    delvor.obj <- list(mesh = mesh, x = x, tri.obj = tri)
-    class(delvor.obj) <- "delvor"
-    invisible(delvor.obj)
+    
+# Reconstruct a triSht-compatible triangulation object
+# while keeping geometry::delaunayn() as the triangulation engine
+
+# Triangle vertices, neighbouring triangles and arc indices
+trlist <- matrix(0L, nrow = nt, ncol = 9L)
+trlist[, 1:3] <- tri
+
+# Arc identifiers
+arc.id <- rep(seq_along(start), times = count)
+
+trlist[cbind(triangle.id, 6L + side.id)] <- arc.id
+
+# Neighbouring triangles
+shared <- which(interior)
+
+if (length(shared) > 0L) {
+    i1 <- start[shared]
+    i2 <- i1 + 1L
+
+    trlist[cbind(triangle.id[i1],
+                 3L + side.id[i1])] <- triangle.id[i2]
+
+    trlist[cbind(triangle.id[i2],
+                 3L + side.id[i2])] <- triangle.id[i1]
+}
+
+colnames(trlist) <- c(
+    "i1", "i2", "i3",
+    "j1", "j2", "j3",
+    "k1", "k2", "k3"
+)
+
+# Circumcircle information
+area <- abs(det) / 2
+
+radius <- sqrt(rowSums((circumcentres - a)^2))
+
+perimeter <- sqrt(rowSums(u^2)) +
+             sqrt(rowSums(v^2)) +
+             sqrt(rowSums((u - v)^2))
+
+inradius <- 2 * area / perimeter
+
+cclist <- cbind(
+    x = circumcentres[, 1L],
+    y = circumcentres[, 2L],
+    r = radius,
+    area = area,
+    ratio = inradius / radius
+)
+
+# Convex hull indices in counterclockwise order
+hull.index <- rev(grDevices::chull(x))
+
+# Delaunay arcs
+arc.matrix <- endpoints
+colnames(arc.matrix) <- c("from", "to")
+
+# Reconstruct the legacy output structure
+tri.obj <- structure(
+    list(
+        n = nrow(x),
+        x = x[, 1L],
+        y = x[, 2L],
+        nt = nt,
+        trlist = trlist,
+        cclist = cclist,
+        nchull = length(hull.index),
+        chull = hull.index,
+        narcs = nrow(arc.matrix),
+        arcs = arc.matrix,
+        call = match.call()
+    ),
+    class = "triSht"
+)
+
+delvor.obj <- list(
+    mesh = mesh,
+    x = x,
+    tri.obj = tri.obj
+)
+
+class(delvor.obj) <- "delvor"
+invisible(delvor.obj)
+
 }

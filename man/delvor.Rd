@@ -42,8 +42,14 @@ identify fictitious endpoints of unbounded Voronoi rays.
    \item{mesh}{A twelve-column matrix with one row for each distinct
    Delaunay edge and its dual Voronoi edge.}
    \item{x}{A two-column matrix with the coordinates of the sample points.}
-   \item{tri.obj}{An integer matrix with three columns, containing the
-   indices of the three sample points forming each Delaunay triangle.}
+   \item{tri.obj}{An object of class \code{"triSht"} containing the
+   Delaunay triangulation and associated geometric information.
+   Its components include \code{trlist}, a matrix containing the
+   triangle vertices, neighbouring triangles and edge indices;
+   \code{cclist}, containing circumcircle information;
+   \code{chull}, containing the indices of the convex hull vertices;
+   and \code{arcs}, containing the Delaunay edges.
+   This structure is retained for backward compatibility.}
 }
 \references{
 Barber, C. B., Dobkin, D. P. and Huhdanpaa, H. (1996).
