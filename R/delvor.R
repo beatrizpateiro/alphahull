@@ -1,64 +1,205 @@
-delvor <-
-function (x, y = NULL) 
+delvor <- function(x, y = NULL)
 {
     X <- xy.coords(x, y)
     x <- cbind(X$x, X$y)
-    if (dim(x)[1] <= 2) {
-        stop("At least three non-collinear points are required")
+    if (nrow(x) < 3L || any(!is.finite(x))) {
+        stop("At least three finite, non-collinear points are required")
     }
-    tri.obj <- tri.mesh(X)
-    tri <- triangles(tri.obj)
-    nt <- nrow(tri)
-    circenter <- matrix(nrow = nt, ncol = 2) 
-    colnames(circenter) <- c("circumx", "circumy")
-    for (i in 1:nt){
-		aux <- circum(c(x[tri[i, 1], 1], x[tri[i, 2], 1], x[tri[i, 3], 1]), c(x[tri[i, 1], 2], x[tri[i, 2], 2], x[tri[i, 3], 2]))
-		circenter[i, ] <- c(aux$x, aux$y)
+    if (anyDuplicated(as.data.frame(x))) {
+        stop("Duplicate points are not supported")
     }
-    tri.info<-cbind(tri, circenter)
 
-    n.tri <- dim(tri.info)[1]
-    n.arc <- max(tri.info[, 7:9])
-    if (n.tri == 1) {
-        aux1 <- cbind(matrix(tri.info[, c("arc1", "node2", "node3")], 
-            ncol = 3, nrow = 1), 1:n.tri, tri.info[, "tr1"])
-        aux2 <- cbind(matrix(tri.info[, c("arc2", "node1", "node3")], 
-            ncol = 3, nrow = 1), 1:n.tri, tri.info[, "tr2"])
-        aux3 <- cbind(matrix(tri.info[, c("arc3", "node1", "node2")], 
-            ncol = 3, nrow = 1), 1:n.tri, tri.info[, "tr3"])
+    # Each row contains the original point indices of a Delaunay triangle.
+    # Reconstruct adjacency instead of using interp's neighbour flags.
+    if (nrow(x) == 3L) {
+        tri <- matrix(1:3, nrow = 1L)
     }
     else {
-        aux1 <- cbind(tri.info[, c("arc1", "node2", "node3")], 
-            1:n.tri, tri.info[, "tr1"])
-        aux2 <- cbind(tri.info[, c("arc2", "node1", "node3")], 
-            1:n.tri, tri.info[, "tr2"])
-        aux3 <- cbind(tri.info[, c("arc3", "node1", "node2")], 
-            1:n.tri, tri.info[, "tr3"])
+        # Center coordinates to improve numerical stability
+        xcentered <- sweep(x, 2L, colMeans(x), "-")
+
+        # Delaunay triangulation using centered coordinates
+        tri <- geometry::delaunayn(xcentered)
     }
-    aux <- rbind(aux1, aux2, aux3)
-    repeated <- duplicated(aux[, 1])
-    aux <- aux[!repeated, ]
-    colnames(aux) <- c("arc", "ind1", "ind2", "indm1", "indm2")
-    bp1 <- (aux[, "indm1"] == 0)
-    bp2 <- (aux[, "indm2"] == 0)
-    is.dummy <- which(bp2)
-    n.dummy <- length(is.dummy)
-    circumcentres <- tri.info[, c("circumx", "circumy")]
-    away <- max(diff(range(x[, 1])), diff(range(x[, 2])))
-    for (i in is.dummy) {
-        n.tri <- n.tri + 1
-        dum <- dummycoor(tri.obj, x[aux[i, "ind1"], ], x[aux[i, 
-            "ind2"], ], tri.info[aux[i, "indm1"], c("circumx", 
-            "circumy")], away)
-        circumcentres <- rbind(circumcentres, dum)
-        aux[i, "indm2"] <- n.tri
+    tri <- matrix(as.integer(tri), ncol = 3L)
+    if (nrow(tri) == 0L) {
+        stop("At least three non-collinear points are required")
     }
-    mesh <- cbind(aux[, c("ind1", "ind2")], x[aux[, "ind1"], 
-        ], x[aux[, "ind2"], ], circumcentres[aux[, "indm1"], 
-        ], circumcentres[aux[, "indm2"], ], bp1, bp2)
-    colnames(mesh) <- c("ind1", "ind2", "x1", "y1", "x2", "y2", 
-        "mx1", "my1", "mx2", "my2", "bp1", "bp2")
-    delvor.obj <- list(mesh = mesh, x = x, tri.obj = tri.obj)
-    class(delvor.obj) <- "delvor"
-    invisible(delvor.obj)
+    if (any(tri < 1L | tri > nrow(x)) ||
+        length(unique(as.vector(tri))) != nrow(x)) {
+        stop("The triangulation omits or misindexes input points")
+    }
+    colnames(tri) <- c("node1", "node2", "node3")
+    nt <- nrow(tri)
+
+    # Circumcentres relative to the first vertex, avoiding cancellation
+    # from differences of large absolute squared coordinates.
+    a <- x[tri[, 1L], , drop = FALSE]
+    u <- x[tri[, 2L], , drop = FALSE] - a
+    v <- x[tri[, 3L], , drop = FALSE] - a
+    det <- u[, 1L] * v[, 2L] - u[, 2L] * v[, 1L]
+    if (any(det == 0) || any(!is.finite(det))) {
+        stop("Degenerate Delaunay triangle")
+    }
+    ru <- rowSums(u * u) / 2
+    rv <- rowSums(v * v) / 2
+    circumcentres <- cbind(
+        a[, 1L] + (ru * v[, 2L] - u[, 2L] * rv) / det,
+        a[, 2L] + (u[, 1L] * rv - ru * v[, 1L]) / det
+    )
+    if (any(!is.finite(circumcentres))) {
+        stop("Non-finite Delaunay circumcentre")
+    }
+
+    # Triangle incidences of each undirected Delaunay edge.
+    sides <- rbind(tri[, c(1L, 2L), drop = FALSE],
+                   tri[, c(2L, 3L), drop = FALSE],
+                   tri[, c(3L, 1L), drop = FALSE])
+    triangle.id <- rep(seq_len(nt), 3L)
+    lo <- pmin(sides[, 1L], sides[, 2L])
+    hi <- pmax(sides[, 1L], sides[, 2L])
+    ord <- order(lo, hi)
+    lo <- lo[ord]
+    hi <- hi[ord]
+    triangle.id <- triangle.id[ord]
+    # Identify the vertex opposite each triangle edge
+    side.id <- rep(c(3L, 1L, 2L), each = nt)[ord] 
+    first <- c(TRUE, lo[-1L] != lo[-length(lo)] |
+                         hi[-1L] != hi[-length(hi)])
+    start <- which(first)
+    count <- diff(c(start, length(lo) + 1L))
+    if (any(count > 2L)) {
+        stop("An edge has more than two incident triangles")
+    }
+
+    endpoints <- cbind(lo[start], hi[start])
+    t1 <- triangle.id[start]
+    t2 <- rep(NA_integer_, length(start))
+    interior <- count == 2L
+    t2[interior] <- triangle.id[start[interior] + 1L]
+    boundary <- !interior
+
+    # Each boundary edge must lie on a supporting line of the convex hull.
+    # This also permits multiple exactly collinear sites along a hull side:
+    # chull() reports only its extremes, but Qhull can subdivide that side.
+    hull.points <- x[chull(x), , drop = FALSE]
+    scale <- max(diff(range(x[, 1L])), diff(range(x[, 2L])))
+    for (i in which(boundary)) {
+        p <- x[endpoints[i, 1L], ]
+        d <- x[endpoints[i, 2L], ] - p
+        cross <- d[1L] * (hull.points[, 2L] - p[2L]) -
+                 d[2L] * (hull.points[, 1L] - p[1L])
+        tol <- 128 * .Machine$double.eps * scale * sqrt(sum(d * d))
+        if (any(cross > tol) && any(cross < -tol)) {
+            stop("Delaunay boundary contains a non-supporting edge")
+        }
+    }
+
+    m1 <- circumcentres[t1, , drop = FALSE]
+    m2 <- matrix(NA_real_, nrow(endpoints), 2L)
+    m2[interior, ] <- circumcentres[t2[interior], , drop = FALSE]
+    away <- max(diff(range(x[, 1L])), diff(range(x[, 2L])))
+    points.obj <- list(x = X$x, y = X$y)
+    for (i in which(boundary)) {
+        m2[i, ] <- dummycoor(points.obj,
+                            x[endpoints[i, 1L], ],
+                            x[endpoints[i, 2L], ],
+                            m1[i, ], away)
+    }
+
+    mesh <- cbind(endpoints,
+                  x[endpoints[, 1L], , drop = FALSE],
+                  x[endpoints[, 2L], , drop = FALSE],
+                  m1, m2,
+                  bp1 = rep(FALSE, nrow(endpoints)),
+                  bp2 = boundary)
+    colnames(mesh) <- c("ind1", "ind2", "x1", "y1", "x2", "y2",
+                        "mx1", "my1", "mx2", "my2", "bp1", "bp2")
+
+    
+# Reconstruct a triSht-compatible triangulation object
+# while keeping geometry::delaunayn() as the triangulation engine
+
+# Triangle vertices, neighbouring triangles and arc indices
+trlist <- matrix(0L, nrow = nt, ncol = 9L)
+trlist[, 1:3] <- tri
+
+# Arc identifiers
+arc.id <- rep(seq_along(start), times = count)
+
+trlist[cbind(triangle.id, 6L + side.id)] <- arc.id
+
+# Neighbouring triangles
+shared <- which(interior)
+
+if (length(shared) > 0L) {
+    i1 <- start[shared]
+    i2 <- i1 + 1L
+
+    trlist[cbind(triangle.id[i1],
+                 3L + side.id[i1])] <- triangle.id[i2]
+
+    trlist[cbind(triangle.id[i2],
+                 3L + side.id[i2])] <- triangle.id[i1]
+}
+
+colnames(trlist) <- c(
+    "i1", "i2", "i3",
+    "j1", "j2", "j3",
+    "k1", "k2", "k3"
+)
+
+# Circumcircle information
+area <- abs(det) / 2
+
+radius <- sqrt(rowSums((circumcentres - a)^2))
+
+perimeter <- sqrt(rowSums(u^2)) +
+             sqrt(rowSums(v^2)) +
+             sqrt(rowSums((u - v)^2))
+
+inradius <- 2 * area / perimeter
+
+cclist <- cbind(
+    x = circumcentres[, 1L],
+    y = circumcentres[, 2L],
+    r = radius,
+    area = area,
+    ratio = inradius / radius
+)
+
+# Convex hull indices in counterclockwise order
+hull.index <- rev(grDevices::chull(x))
+
+# Delaunay arcs
+arc.matrix <- endpoints
+colnames(arc.matrix) <- c("from", "to")
+
+# Reconstruct the legacy output structure
+tri.obj <- structure(
+    list(
+        n = nrow(x),
+        x = x[, 1L],
+        y = x[, 2L],
+        nt = nt,
+        trlist = trlist,
+        cclist = cclist,
+        nchull = length(hull.index),
+        chull = hull.index,
+        narcs = nrow(arc.matrix),
+        arcs = arc.matrix,
+        call = match.call()
+    ),
+    class = "triSht"
+)
+
+delvor.obj <- list(
+    mesh = mesh,
+    x = x,
+    tri.obj = tri.obj
+)
+
+class(delvor.obj) <- "delvor"
+invisible(delvor.obj)
+
 }

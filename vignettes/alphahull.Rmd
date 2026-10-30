@@ -1,0 +1,423 @@
+---
+title: "Generalizing the Convex Hull of a Sample: The R Package alphahull"
+subtitle: "Updated for alphahull 3.0.1"
+author:
+  - "Beatriz Pateiro-López"
+  - "Alberto Rodríguez-Casal"
+output: rmarkdown::html_vignette
+bibliography: biblioJSS.bib
+link-citations: true
+vignette: >
+  %\VignetteIndexEntry{Generalizing the Convex Hull of a Sample: The R Package alphahull}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+*Departamento de Estatística e Investigación Operativa, Universidade de Santiago de Compostela, Spain.*
+*Centro de Investigación e Tecnoloxía Matemática de Galicia (CITMAga)*
+
+## Abstract
+
+This vignette presents the R package `alphahull` which implements the $\alpha$-convex hull and the $\alpha$-shape of a finite set of points in the plane. These geometric structures provide an informative overview of the shape and properties of the point set. Unlike the convex hull, the $\alpha$-convex hull and the $\alpha$-shape are able to reconstruct non-convex sets. This flexibility make them specially useful in set estimation.  Since the implementation is based on the intimate relation of theses constructs with Delaunay triangulations, the R package `alphahull` also includes functions to compute Voronoi and Delaunay tesselations.
+
+**Keywords:** set estimation, convexity, $\alpha$-convexity, $\alpha$-convex hull, $\alpha$-shape, R software
+
+<!-- Generated from the original Sweave vignette. Manual figure and reference numbers preserve the source article. -->
+
+```{r chunk-1, include=FALSE}
+library(alphahull)
+set.seed(1234)
+# Vector SVG figures look sharp at any screen size. If Cairo is unavailable
+# (for example on a minimal CRAN check machine), use high-resolution PNG.
+knitr::opts_chunk$set(
+  dev = if (isTRUE(capabilities("cairo"))) "svg" else "png",
+  dpi = 180,
+  fig.retina = 1
+)
+```
+
+# 1. Introduction {#sec1}
+The problem of reconstructing a set $S$ from a finite set of points taken into it has been addressed in different fields of research. In computational geometry, for instance, the efficient construction of convex hulls for finite sets of points has important applications in pattern recognition, cluster analysis and image processing, among others. We refer the reader to [@Preparata85] for an introduction to computational geometry and its applications. From a probabilistic point of view, the set of points from which we try to reconstruct $S$ is assumed to be non-deterministic. Thus, the term set estimation refers to the statistical problem of estimating an unknown set  given a random sample of points whose distribution is closely related to it. Under this perspective, the target $S$ might be, for example, a distribution support, its boundary or a level set. See [@Cuevas09] for a survey of set estimation theory.
+
+The support estimation problem is formally established as the problem of estimating the support of an absolutely continuous probability measure from independent observations drawn from it. The papers by [@Geffroy64], [@Renyi63], and [@Renyi64] are the first works on support estimation.  They deal with the convex case. When $S$ is a convex support the natural estimator is the convex hull of the sample. See [@Schneider88] for classical results on the convex hull estimator. However, when $S$ is not convex, the convex hull of the sample is not an appropriate choice. In a more flexible framework, [@Chevalier76] and [@Dev80] proposed to estimate the support (without any shape restriction) of an unknown probability measure by means of a smoothed version of the sample. The problem of support estimation is introduced by [@Dev80] in connection with a practical application, the detection of abnormal behaviour of a system, plant or machine. We refer to  [@Kor93] for a compilation of the most relevant theoretical results on the performance of such estimator.
+Anyhow, there are also approaches in-between the two aforementioned. In [@Rodriguez06], the estimation of an $\alpha$-convex support is considered. The $\alpha$-convexity is a condition that affects the shape of the set of interest but which is much more flexible than convexity and therefore, it allows a wider range of applications. The $\alpha$-convex hull of the sample is the natural estimator when $S$ is $\alpha$-convex. In this work we discuss the details on the implementation of this estimator.
+
+Set estimation is also related to another interesting problem, the estimation of certain geometric characteristics of the set $S$ such as the surface area (boundary length in $\mathbb{R}^2$). There are other statistical fields which also cope with problems regarding set measurements as, for example, the stereology. However, stereology focuses on the estimation of certain geometric characteristics of $S$ without needing to reconstruct the set, see, e.g., [@Baddeley05], [@Orive01],  whereas the primary object of interest of set estimation is the set itself. So in our framework, given a random sample of points in $S$, the solution to the surface area estimation problem consists in defining an estimator that captures the shape of $S$ and then estimating the surface area of $S$ by means of the surface area of the estimator. [@Braker98] studied the asymptotic properties of the boundary length of the convex hull of a random sample of points in $\mathbb{R}^2$. They obtained the asymptotic normality of the boundary length of the convex hull estimator as well as its convergence rate in mean. In spite of the fact that the results are really significant, they are established on the assumption that the set of interest is convex, which may be too restrictive in practice. As mentioned before, more flexible estimators, such as the $\alpha$-convex hull, can be considered.  The $\alpha$-shape, introduced by [@Edels83], is another geometrical structure that serves to characterize the shape of a set. Its definition is based on a generalization of the convex hull. This vignette presents the R implementation ([@Rcran]) of the $\alpha$-convex hull and $\alpha$-shape of a random sample of points in the plane with the package `alphahull`, see [@alphahull]. 
+
+The document is organized as follows. In Section [2](#sec2) we introduce some notation and describe the primary estimators under study, the $\alpha$-convex hull and the $\alpha$-shape of a random sample of points taken in the set of interest. The details on the implementation in R of the estimators are given in Section [3](#sec3), along with the comprehensive description of the library `alphahull`. Section [4](#sec5) concludes with a discussion of the contributions included in this document.
+
+# 2. The $\alpha$-convex hull {#sec2}
+Let $S$ be a nonempty compact subset of the $d$-dimensional Euclidean space $\mathbb{R}^d$, equipped with the norm $\left\|\cdot\right\|$. Assume that we are given a random sample $\mathcal{X}_n=\{X_1,\ldots,X_n\}$ from $X$, where $X$ denotes a random variable in $\mathbb{R}^d$ with distribution $P_X$ and support $S$. The problem is to find a suitable estimator of $S$ based on the sample. It seems natural that, in order to properly define such estimator, we should impose some geometric restriction on $S$. As we have already commented, assuming convexity considerably limits the family of sets to estimate. So we focus on a more flexible shape condition, named $\alpha$-convexity. 
+
+We denote by $\mathring{B}(x,r)$ and ${B}(x,r)$ the open and closed ball with center $x$ and radius $r$, respectively. Given $A\subset\mathbb{R}^d$, $A^c$ and $\partial{A}$ will denote the complement and boundary of $A$, respectively.
+
+A set $A\subset \mathbb{R}^d$ is said to be $\alpha$-convex, for $\alpha>0$, if $A=C_\alpha(A),$ where
+
+<span id="eq-rconvhull"></span>
+
+$$
+C_\alpha(A)=\bigcap_{\{\mathring{B}(x,\alpha):\ \mathring{B}(x,\alpha)\cap A=\emptyset\}}{\left(\mathring{B}(x,\alpha)\right)^c}
+$$
+
+is called the $\alpha$-convex hull of $A$. Therefore, if $A$ is $\alpha$-convex any point of
+$A^c$ can be separated from $A$ by means of an open ball of radius $\alpha$. Note that the definition of the $\alpha$-convex hull given by ([1](#eq-rconvhull)) reminds 
+us of the definition of the convex hull, but replacing 
+the open balls of radius $\alpha$ with half-spaces. Regarding the relation between convexity and $\alpha$-convexity, it can 
+be proved that, if $A$ is convex and closed, then it is also $\alpha$-convex for all $\alpha>0$. If the interior of the convex hull is not empty
+then the reciprocal is also true, see [@Walther99]. 
+
+Using the same ideas as in the convex case, an estimator for an $\alpha$-convex support can be defined. Assume that $S$ is $\alpha$-convex for some $\alpha>0$. Then it seems reasonable to consider an estimator fulfilling this shape restriction. So, given a sample $\mathcal{X}_n\subset S$, the natural estimator of $S$
+is the smallest $\alpha$-convex set which contains $\mathcal{X}_n$, that is, the $\alpha$-convex hull of the sample, $C_\alpha(\mathcal{X}_n)$,
+see Figure [1](#fig-ahull).
+
+What can we say about the performance of $C_\alpha(\mathcal{X}_n)$ as a support estimator?
+Like in other contexts, in order to evaluate a set estimator, we need certain measure of the distance between the estimator and the target $S$. Thus, the performance of a set estimator is usually evaluated  through either the Hausdorff distance, $d_H$, or the distance in measure, $d_\mu$, where $\mu$ stands for the Lebesgue measure. We refer to [@Edgar90] for a discussion on metrics between sets. [@Rodriguez06] proved that, if $S$ is $\alpha$-convex and standard with respect to $P_X$, then $d_H(S,C_\alpha(\mathcal{X}_n))=O((\log n/n)^{1/d})$ almost surely. A Borel set $A$ is said to be standard with respect to a Borel measure $\nu$ if
+there exists $\varepsilon_0>0$ and $\delta>0$ such that $\nu(B(x,\varepsilon)\cap A)\geq \delta\mu(B(x,\varepsilon))$, for all $x\in A$, $0<\varepsilon\leq\varepsilon_0$. The standardness condition prevents the set $S$ from being too spiky, see [@Cuevas97] for more details. Although the family of $\alpha$-convex sets is much wider than the family of convex sets, $C_\alpha(\mathcal{X}_n)$ achieves the same convergence rates as the convex hull of $\mathcal{X}_n$ in the convex case, see [@Dumbgen96]. Moreover, if $S$ belongs to Serra's regular model, that is, if $S$ is morphologically open and closed with respect to a compact ball of radius $\alpha$ (see [@Serra84]), then $d_H(S,C_\alpha(\mathcal{X}_n))=O((\log n/n)^{2/(d+1)})$ almost surely. Again, the $\alpha$-convex hull is able to achieve the same convergence rate as the convex hull when $S$ belongs to the Serra's regular model.
+
+```{r chunk-2, include=FALSE}
+# Uniform sample of size n=300 in the disc B(c,0.5)\B(c,0.25) 
+# with c=(0.5,0.5).
+n<-150
+theta<-runif(n,0,2*pi)
+r<-sqrt(runif(n,0.25^2,0.5^2))
+x<-cbind(0.5+r*cos(theta),0.5+r*sin(theta))
+alpha<-0.1
+```
+
+<span id="fig-ahull"></span>
+
+```{r fig-ahull, echo=FALSE, fig.width=6, fig.height=4.5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(0,type="n",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",axes=FALSE,asp=1)
+plot(ahull(x,alpha=alpha),col=c(6,1,1),xlab="",ylab="",add=TRUE)
+```
+
+*Figure 1. In pink, $\alpha$-convex hull of a set of points in the plane for some $\alpha>0$.*
+
+[@Edels83] defined in $\mathbb{R}^2$ a similar construct, the $\lambda$-hull of a finite set of points in the plane, for an arbitrary $\lambda\in\mathbb{R}$. Following their terminology, $C_\alpha(\mathcal{X}_n)$ equals the $\lambda$-hull of $\mathcal{X}_n$ for $\lambda=-1/\alpha$ and it can be computed in time $O(n\log n)$ using $O(n)$ space. The algorithm, described in Section [3](#sec3), is based on the closed relationship that exists between $\lambda$-hulls and Delaunay triangulations. The Delaunay triangulation of a finite set of points contains, as subgraphs, various structures that have important applications in pattern recognition, cluster analysis, *etc*. See [@Auren00] for a survey. The $\alpha$-shape is one of those subgraphs, derived from a straightforward generalization  of the convex hull. For $\alpha>0$, the $\alpha$-shape of $\mathcal{X}_n$ is defined as the straight line graph connecting $\alpha$-neighbour points. Two points $X_i,X_j\in\mathcal{X}_n$ are $\alpha$-neighbour if there exists an open ball of radius $\alpha$ with both points on its boundary and which contains no sample points, see Figure [2](#fig-ashape). The definition of $\alpha$-shape can be extended to arbitrary real $\alpha$ and higher dimensions, see [@Edels94]. The $\alpha$-shape is an approach to formalize the intuitive notion of shape for spatial point sets. The value of the parameter $\alpha$ controls the shape of the estimator. For sufficiently large $\alpha$, the $\alpha$-shape is identical to the boundary
+of the convex hull of the sample. As $\alpha$ decreases, the shape shrinks until that, for sufficiently small $\alpha$, the  $\alpha$-shape is the empty set, see Figure [3](#fig-influye). As with the $\alpha$-convex hull, the $\alpha$-shape of $n$ points in the plane can be determined in time $O(n\log n)$ and space $O(n)$, see [@Edels83]. The description of the algorithm and the details of its implementation in R are given in Section [3](#sec3).
+
+<span id="fig-ashape"></span>
+
+```{r fig-ashape, echo=FALSE, fig.width=6, fig.height=4.5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(0,type="n",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",axes=FALSE, asp=1)
+plot(ashape(x,alpha=alpha),col=c(4,1),xlab="",ylab="",add=TRUE)
+```
+
+*Figure 2. In blue, $\alpha$-shape of a set of points in the plane for some $\alpha>0$. Two points are $\alpha$-neighbours if there exists an open ball of radius $\alpha$ with both points on its boundary and which contains no sample points.*
+
+```{r chunk-3, include=FALSE}
+# Uniform sample of size n=300 in the disc B(c,0.5)\B(c,0.25) 
+# with c=(0.5,0.5).
+n<-300
+theta<-runif(n,0,2*pi)
+r<-sqrt(runif(n,0.25^2,0.5^2))
+x<-cbind(0.5+r*cos(theta),0.5+r*sin(theta))
+```
+
+<span id="fig-influye"></span>
+
+```{r fig-influye, echo=FALSE, fig.width=14, fig.height=5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,3))
+alpha1=0.02
+alpha2=0.25
+alpha3=1
+plot(ashape(x,alpha=alpha1),col=c(4,1),xlab="",ylab="",main=expression(paste(alpha," = 0.02 ")))
+plot(ashape(x,alpha=alpha2),col=c(4,1),xlab="",ylab="",main=expression(paste(alpha," = 0.25")))
+plot(ashape(x,alpha=alpha3),col=c(4,1),xlab="",ylab="",main=expression(paste(alpha," = 1")))
+par(mfrow=c(1,1))
+```
+
+*Figure 3. Influence of the parameter $\alpha$ on the $\alpha$-shape. From left to right, $\alpha$-shape of a random sample of size $n=`r n`$ on the annulus with outer radius $0.5$ and inner radius $0.25$ for $\alpha=`r alpha1`,`r alpha2`,`r alpha3`$.*
+
+# 3. Implementation {#sec3}
+The R package `alphahull` consists of three main functions: `delvor`, `ashape`, and `ahull`. The implementation of the $\alpha$-convex hull and of the $\alpha$-shape is based on the intimate relation of theses constructs with Delaunay triangulations. The function `delvor` described in Subsection [3.1](#sub3-1) computes the Delaunay triangulation and the Voronoi diagram of a given sample of points in the plane. Based on the information provided by the function `delvor`, the function `ashape`  described in Subsection [3.2](#sub3-2) constructs the $\alpha$-shape for a given value of $\alpha>0$. Finally, the function `ahull` described in Subsection [3.3](#sec3-3) constructs the $\alpha$-convex hull. The R package `alphahull` also includes plot functions for the different objects and some other auxiliary functions which are described throughout this section.
+
+## 3.1. Voronoi diagram and Delaunay triangulation {#sub3-1}
+The Voronoi diagram of a finite sample of points $\mathcal{X}_n=\{X_1,\ldots, X_n\}$ in $\mathbb{R}^2$ is a covering of the plane by $n$ regions $V_i$ where, for each $i\in\{1,\ldots, n\}$, the cell $V_i$ consists of all points in $\mathbb{R}^2$ which have $X_i$ as nearest sample point. That is, $V_i=\{x\in\mathbb{R}^2:\ \left\|x-X_i\right\|\leq \left\|x-X_j\right\| \text{ for all } X_j\in\mathcal{X}_n\}.$ We denote the Voronoi Diagram of $\mathcal{X}_n$ by $VD(\mathcal{X}_n)$. The Voronoi cells are closed and convex. Furthermore, $V_i$ is unbounded if and only if $X_i$ lies on the boundary of the convex hull of $\mathcal{X}_n$. Otherwise $V_i$ is a nonempty convex polygon. Two sample points $X_i$ and $X_j$ are said to be Voronoi neighbours if the cells $V_i$ and $V_j$ share a common point.
+
+A triangulation of $\mathcal{X}_n$ is a planar graph with vertex set $\mathcal{X}_n$ and straight line edges that partition into triangles the convex hull of the nodes $\mathcal{X}_n$. The Delaunay triangulation of $\mathcal{X}_n$, denoted by $DT(\mathcal{X}_n)$, is defined as the straight line dual to $VD(\mathcal{X}_n)$. That is, there exists a Delaunay edge connecting the sample points $X_i$ and $X_j$ if and only if they are Voronoi neighbours, see Figure [4](#fig-dual). In other words, each circumcentre of a Delaunay triangle coincides with a Voronoi cell vertex. The Delaunay triangulation was introduced by [@Vor08] and extended by [@Del34], to whom it owes its name. A complete overview over the existing literature on these geometric constructions can be found in [@Okabe00]. We also refer to the survey by [@Auren91] for  more details on the properties of the Delaunay triangulations and the Voronoi diagrams and their multiple applications.
+
+```{r chunk-4, include=FALSE}
+#x<-matrix(runif(20),nc=2)
+x1<-c(0.5915,0.6230,0.9689,0.8248,0.9392,0.8156,0.2050,0.9757,0.0957,0.4139)
+y1<-c(0.472,0.619,0.304,0.197,0.716,0.575,0.507,0.574,0.996,0.893)
+x<-cbind(x1,y1)
+```
+
+<span id="fig-dual"></span>
+
+```{r fig-dual, echo=FALSE, fig.width=6, fig.height=4.5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(0,type="n",xlim=c(0,1),ylim=c(0,1),xlab="",ylab="",axes=FALSE,asp=1)
+plot(delvor(x),col=1:3,xlab="",ylab="",add=TRUE)
+```
+
+*Figure 4. There is a one-to-one correspondence between the Voronoi diagram (in green) and the Delaunay triangulation (in red).*
+
+From the computational viewpoint, efficient methods for the computation of Delaunay triangulations and Voronoi diagrams have been developed. [@Auren00] presented a review of algorithms, from the earliest intuitive methods to more efficient representations of these geometric structures. For example, the incremental insertion process by [@Green78], the Divide and Conquer method by [@Shamos75] or the plane-sweep technique by [@Fortune87] are the basis of a large class of worst-case optimal algorithms for computing the whole Voronoi diagram in the plane. Of course, these techniques can also be applied to the computation
+of the Delaunay triangulation. See for example the efficient incremental algorithm by [@Lawson77]. Both the Voronoi diagram and the Delaunay triangulation of $n$ points can be computed in $O(n\log n)$ time and linear space. Furthermore, by the duality between the Voronoi diagram and the Delaunay triangulation, either tessellation is easily obtained from a representation of the other in $O(n)$ time.
+
+Currently, there are several libraries available in R that compute the Delaunay triangulation or the Voronoi diagram of a given set of points. See the packages `deldir` by [@deldir] or `geometry` by [@geometry], among others. These libraries differ on the implemented algorithms and the data structures that store the information. For example, the package `deldir` computes the Delaunay triangulation and the Voronoi diagram of a planar point set according to the second iterative algorithm of [@Lee80]. Unfortunately, this package does not return the kind of data structure we need in order to compute the $\alpha$-shape and the $\alpha$-convex hull. The function `deldir` computes the triangulation of a set of points enclosed in a finite rectangular window.  In consequence, the endpoints of the Voronoi edges outside that window are discarded. This fact does not appear to be a problem unless we need to know all the Voronoi edges, as in our case. Note that, in principle, the location of the furthest Voronoi vertex is unknown and enlarging the window size to ensure that the information is complete has a considerable computational cost.  Our package `alphahull` computes the Delaunay triangulation
+and the Voronoi diagram with respect to the whole plane.
+For each edge of the Delaunay triangulation, the corresponding
+segment in the Voronoi diagram is obtained by connecting the
+circumcentres of the two neighbouring triangles that share
+that edge. For those edges of the Delaunay triangulation that
+lie on the boundary of the convex hull, the corresponding
+Voronoi edges are semi-infinite.
+
+The Delaunay triangulation is computed using the function
+`delaunayn` from package `geometry`. The corresponding
+Voronoi diagram is constructed directly from the Delaunay
+triangulation by computing the circumcentres of the triangles
+and identifying their adjacency relationships. This approach
+allows us to obtain the primal and dual geometric structures
+without restricting the computation to a finite rectangular
+window.
+
+The output of the function `delvor` is a list with three
+components. The first component, `mesh`, stores the primal
+and dual information. For each edge of the Delaunay
+triangulation, `mesh` contains the indices `ind1`,
+`ind2` and the coordinates (`x1`, `y1`),
+(`x2`, `y2`) of the sample points that form the edge,
+the coordinates of the endpoints of the corresponding segment
+in the Voronoi diagram (`mx1`, `my1`),
+(`mx2`, `my2`), and indicators identifying the
+endpoints of Voronoi edges that represent unbounded extremes.
+Specifically, `bp1 = 1` if (`mx1`, `my1`) is a
+dummy node, and similarly for `bp2`.
+
+The second component, `x`, stores the sample points.
+The third component, `tri.obj`, contains the Delaunay
+triangulation and associated geometric information, including
+triangle vertices, adjacency relationships, circumcircle
+information, and convex hull indices. Although the
+triangulation is now computed using `geometry`, this
+component retains a structure compatible with the
+`triSht` objects previously returned by `interp`,
+in order to preserve backward compatibility with existing
+code and dependent packages.
+
+As an illustration, we have applied the function `delvor`
+to a given set of $n=5$ points. The result is assigned to the
+object `dv` and printed out.
+
+```{r chunk-5}
+x <- c(0.905, 0.606, 0.458, 0.988, 0.744)
+y <- c(0.763, 0.937, 0.095, 0.259, 0.731) 
+dv <- delvor(x,y)
+dv
+```
+
+The plot of the previous Delaunay triangulation and Voronoi diagram is displayed in Figure [5](#fig-delvor). This graph is produced 
+using the function `plot.delvor` (S3 method for class 'delvor'). The arguments are the same as those of the function `plot.deldir` from package `deldir`.
+
+```{r chunk-6, results='hide', fig.show='hide'}
+plot(dv, main = "Delaunay triangulation and Voronoi diagram",col = 1:3, xlab = "x-coordinate", ylab = "y-coordinate",xlim = c(-0.5, 1.5), ylim = c(-0.5, 1.5), number = TRUE)
+```
+
+<span id="fig-delvor"></span>
+
+```{r fig-delvor, echo=FALSE, fig.width=6, fig.height=4.5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(dv, main = "Delaunay triangulation and Voronoi diagram",col = 1:3, xlab = "x-coordinate", ylab = "y-coordinate",xlim = c(-0.5, 1.5), ylim = c(-0.5, 1.5), number = TRUE, asp=1)
+```
+
+*Figure 5. Plot of the Delaunay triangulation (red) and Voronoi diagram (green) of a uniform random sample of size $n=5$ on the unit square. The dashed green lines correspond to the unbounded Voronoi edges.*
+
+## 3.2. The $\alpha$-shape {#sub3-2}
+For the construction of the $\alpha$-shape of a finite sample of points $\mathcal{X}_n$, the package `alphahull` implements the algorithm by [@Edels83], see Table [1](#alg-shape).
+
+<span id="alg-shape"></span>
+
+**Table 1. Algorithm for computing the $\alpha$-shape**
+
+1. Construct the Voronoi diagram and Delaunay triangulation of $\mathcal{X}_n$. 
+2. Determine the $\alpha$-extremes of  $\mathcal{X}_n$.
+3. Determine the $\alpha$-neighbours of  $\mathcal{X}_n$. 
+4. Output the $\alpha$-shape.
+
+The algorithm relies on the notion of $\alpha$-extreme point and $\alpha$-neighbour. A sample point $X_i$ is termed $\alpha$-extreme if there exists an open ball of radius $\alpha$ with $X_i$ on its boundary and which contains no sample points. Finding the $\alpha$-extreme points is not a difficult task once the Delaunay triangulation and the Voronoi diagram are determined. Note that, if the sample points $X_i$ lies on the convex hull of $\mathcal{X}_n$, then $X_i$ is $\alpha$-extreme for all $\alpha>0$. If $X_i$ does not lie on the convex hull we only need to compute the distances from $X_i$ to the vertexes of the Voronoi cell $V_i$. Then, $X_i$ is $\alpha$-extreme for all $\alpha$ satisfying $0<\alpha\leq \max\{\left\|X_i-v\right\|,\ v\text{ vertex of } V_i\}$. Finding the $\alpha$-neighbour points is, however, trickier. Consider an edge of the Delaunay triangulation connecting the sample points $X_i$ and $X_j$ and its dual edge of the Voronoi diagram. The points $X_i$ and $X_j$ are $\alpha$-neighbours for all $\alpha$ satisfying $\alpha_{\min}\leq\alpha\leq \alpha_{\max}$, where $\alpha_{\min}$ and $\alpha_{\max}$ are determined from the position of $X_i$ and $X_j$ with respect to the vertexes of the dual Voronoi edge.
+
+The function `ashape`, included in the library `alphahull`, computes the $\alpha$-shape of a given sample $\mathcal{X}_n$ for a given value of $\alpha>0$. The output of the function `ashape` is a list with six components. The components  `x` and `alpha` store the input information whereas the component `delvor.obj` stores the output object from the function `delvor`, see Subsection [3.1](#sub3-1). The indexes of the $\alpha$-extremes are given by the component `alpha.extremes`. The $\alpha$-neighbours connections are given by the first two columns of the matrix `edges`. The structure of `edges` is that of matrix `mesh` returned by the function `delvor`. Note that the $\alpha$-shape is a subgraph of the Delaunay triangulation and, therefore,  `edges` is a submatrix of `mesh`. The length of the $\alpha$-shape is stored in the component `length`. The function `plot.ashape` (S3 method for class 'ashape') produces a plot of the $\alpha$-shape. Graphic parameters can control the plot appearance. Moreover, the Delaunay triangulation and the Voronoi diagram can be added to the plot by specifying the argument `wlines` (`wlines = "del"` for the Delaunay triangulation, `wlines = "vor"` for the Voronoi diagram or `wlines = "both"` for both plots). Next, we show an example on how these functions work. We have applied the function `ashape` to a uniform random sample of size $n=50$ on the unit square with $\alpha=0.2$. The result is assigned to the object `alphashape`.
+
+```{r chunk-7, results='hide', fig.show='hide'}
+x<-matrix(runif(100),ncol=2)
+alpha <- 0.2
+alphashape <- ashape(x, alpha = alpha)
+```
+
+```{r chunk-8}
+names(alphashape)
+```
+
+A plot of the $\alpha$-shape may be obtained as follows. The result is displayed in Figure [6](#fig-ashape2).
+
+```{r chunk-9, results='hide', fig.show='hide'}
+plot(alphashape, col = c(4, 1), xlab = "x-coordinate", ylab = "y-coordinate", main = expression(paste(alpha, "-shape")))
+```
+
+<span id="fig-ashape2"></span>
+
+```{r fig-ashape2, echo=FALSE, fig.width=6, fig.height=4.5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(alphashape, col = c(4, 1), xlab = "x-coordinate", ylab = "y-coordinate", main = expression(paste(alpha, "-shape")),asp=1)
+```
+
+*Figure 6. Plot of the $\alpha$-shape of a uniform random sample of size $n=50$ on the unit square for $\alpha=0.2$.*
+
+Also the Delaunay triangulation can be plotted by specifying the argument `wlines` as in the following code. The result is displayed in Figure [7](#fig-ashape3).
+
+```{r chunk-10, results='hide', fig.show='hide'}
+plot(alphashape, wlines = "del", col = c(4, 1, 2), xlab = "x-coordinate", ylab = "y-coordinate")
+```
+
+<span id="fig-ashape3"></span>
+
+```{r fig-ashape3, echo=FALSE, fig.width=6, fig.height=4.5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(alphashape, wlines = "del", col = c(4, 1, 2), xlab = "x-coordinate",ylab = "y-coordinate",main = expression(paste(alpha, "-shape and Delaunay triangulation")),asp=1)
+```
+
+*Figure 7. Plot of the $\alpha$-shape (in blue) and Delaunay triangulation (in red) of a uniform random sample of size $n=50$ on the unit square for $\alpha=0.2$. The $\alpha$-shape is a subgraph of the Delaunay triangulation.*
+
+## 3.3. The $\alpha$-convex hull {#sec3-3}
+Recall the definition of the $\alpha$-convex hull given in Equation ([1](#eq-rconvhull)). By DeMorgan's law, the complement of $C_\alpha(\mathcal{X}_n)$ can be written as the union of all open balls of radius $\alpha$ which contain no point of $\mathcal{X}_n$, that is,
+
+<span id="eq-JLc"></span>
+
+$$
+C_\alpha(\mathcal{X}_n)^c=\bigcup_{\{\mathring{B}(x,\alpha):\ \mathring{B}(x,\alpha)\cap \mathcal{X}_n=\emptyset\}}{\mathring{B}(x,\alpha)}.
+$$
+
+Therefore, in order to compute the complement of the $\alpha$-convex hull of a sample of points we should identify all those balls of radius $\alpha$ that do contain no point of the sample. Fortunately, the problem simplifies thanks to the following lemma by [@Edels83].
+
+<span id="lemma-vecina"></span>
+
+**Lemma 1.** Let $\mathring{B}(x,r)$ be an open ball which does not contain any point of a sample $\mathcal{X}_n$. Either $\mathring{B}(x,r)$ lies entirely outside the convex hull of  $\mathcal{X}_n$ or there is an open ball which contains $\mathring{B}(x,r)$ but no points of $\mathcal{X}_n$ and which has its centre on an edge of $VD(\mathcal{X}_n)$.
+
+Therefore, we only have to consider appropriate balls centered on edges of $VD(\mathcal{X}_n)$. For the implementation we have considered the two following situations. First, if $X_i$ and $X_j$ are two sample points such that the corresponding Voronoi cells $V_i$ and $V_j$ share a common closed line segment $[a,b]$, then it
+ follows from the duality between the $VD(\mathcal{X}_n)$ and $DT(\mathcal{X}_n)$ that the union of open balls with centres on the edge $[a,b]$ which do not contain any point of a sample is equal to $\mathring{B}(a,\left\|a-X_i\right\|)\cup \mathring{B}(b,\left\|b-X_i\right\|)$.  Second, if $X_i$ and $X_j$ are two sample points such that the corresponding Voronoi cells $V_i$ and $V_j$ share a common semi-infinite line segment $[a,+\infty)$, then the union of open balls with centres on the edge $[a,+\infty)$ which do not contain any point of a sample can be written as
+$\mathring{B}(a,\left\|a-X_i\right\|)\cup H(X_i,X_j),$
+where $H(X_i,X_j)$ denotes the open halfplane defined by the straight line through $X_i$ and $X_j$. It can be shown that,
+for each edge of the Voronoi diagram, the union of open balls with centres on it and radius $\alpha$ which do not contain any point of $\mathcal{X}_n$ can be
+written as the union of a finite number of open balls or halfplanes. As a consequence, the complement of the $\alpha$-convex hull of $n$ points can be expressed as the union of $O(n)$ open balls and halfplanes, see Lemma 6 by [@Edels83]. 
+The package `alphahull` implements the algorithm in Table [2](#alg-hull).
+
+<span id="alg-hull"></span>
+
+**Table 2. Algorithm for computing the $\alpha$-convex hull**
+
+1. Construct the Voronoi diagram and Delaunay triangulation of $\mathcal{X}_n$. 
+2. Determine the union of open balls and halfplanes that form $C_\alpha(\mathcal{X}_n)^c$.
+3. Output the $\alpha$-convex hull.
+
+The function `ahull`, included in the library `alphahull`, computes the $\alpha$-convex hull of a given sample $\mathcal{X}_n$ for a given value of $\alpha>0$. The output of the function `ahull` is a list with six components. Information about the open balls and halfplanes that define the complement of the $\alpha$-convex hull is stored in the component `complement`. For each row $i$, `complement[i, ]` contains the information relative to an open ball or halfplane of the complement. The first three columns are assigned to the characterization of the ball or halfplane $i$. Thus, if the row $i$ refers to an open ball, `complement[i, 1:3]` contains the center and radius of the ball. If the row $i$ refers to a halfplane, `complement[i, 1:3]` determines its equation. For the halfplane $y>a+bx$, `complement[i, 1:3] = (a, b, -1)`. In the same way, for the halfplane $y<a+bx$, `complement[i, 1:3]=(a, b, -2)`, for the halfplane $x>a$, `complement[i, 1:3]=(a, 0, -3)` and for the halfplane $x<a$, `complement[i, 1:3] = (a, 0, -4)`. On the other
+hand, the  component `arcs` stores 
+the boundary of the $\alpha$-convex. Note that $\partial C_\alpha(\mathcal{X}_n)$ is formed by arcs of balls of radius $\alpha$ (besides possible isolated sample points). These arcs are determined by the intersections of some of the balls that define the complement of the $\alpha$-convex hull. The extremes of an arc can be written as $c+rA_\theta(v)$ and $c+rA_{-\theta}(v)$ where $c$ and $r$ represent the center and radius of the arc, respectively, and $A_\theta(v)$ represents the clockwise rotation of angle $\theta$ of a unitary vector $v$, see Figure [8](#fig-angle). Thus, the structure of the matrix `arcs` is as follows. For each arc of the boundary, the first two columns (`c1`, `c2`) correspond to the coordinates of the center $c$. The third column `r` corresponds to the radius $\alpha$. The next two columns (`v.x`, `v.y`) correspond to the coordinates of the unitary vector $v$ whereas the angle $\theta$ is stored in the sixth column `theta`. Finally, the indices of the end points of each arc are stored in the last two columns, `end1` and `end2`. For isolated points in the boundary of the $\alpha$-convex hull, columns 3 to 6 of the matrix `arcs` are equal to zero. The component `xahull` consists on a 2-column matrix with the coordinates of the original set of points besides possible new end points of the arcs in the boundary of the $\alpha$-convex hull. The component `alpha` stores the input information and the component `ashape.obj` stores the output object from the function `ashape` (see Subsection [3.2](#sub3-2)) which is invoked during the computation of the $\alpha$-convex hull. Finally, the boundary length of the $\alpha$-convex hull is stored in the component `length`.
+
+<span id="fig-angle"></span>
+
+```{r fig-angle, echo=FALSE, fig.width=4, fig.height=4, out.width='45%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(0,type="n",axes=FALSE,xlim=c(0,0.5),ylim=c(0,0.5),xlab="",ylab="")
+r<-0.5
+t<-0
+segments(0,0,r*cos(t),r*sin(t),col=4,lty=2)
+points(r*cos(t),r*sin(t),pch=19,col=4)
+
+t<-pi/6
+arrows(0,0,0.3*cos(t),0.3*sin(t))
+v<-c(0.3*cos(t),0.3*sin(t))
+v<-v/sqrt(sum(v^2))
+arc(c(0,0),0.5,v,pi/6,col=4,lwd=2)
+t<-pi/3
+segments(0,0,r*cos(t),r*sin(t),col=4,lty=2)
+points(r*cos(t),r*sin(t),pch=19,col=4)
+
+t<-pi/12
+v<-c(0.3*cos(t),0.3*sin(t))
+v<-v/sqrt(sum(v^2))
+arc(c(0,0),0.3,v,pi/12,col=1)
+
+text(0.15,0.11,expression(italic(v)),cex=1.5)
+text(0.31,0.07,expression(italic(theta)),cex=1.5)
+text(-0.015,0,expression(italic(c)),cex=1.5)
+text(0.15,0.3,expression(italic(r)),cex=1.5)
+```
+
+*Figure 8. The extremes of an arc can be written as $c+rA_\theta(v)$ and $c+rA_{-\theta}(v)$, where $A_\theta(v)$ represents the clockwise rotation of angle $\theta$ of the unitary vector $v$.*
+
+The function `plot.ahull` (S3 method for class 'ahull') produces a plot of the $\alpha$-convex hull. As with `plot.ashape` and `plot.delvor` some graphic parameters can control the plot appearance. The $\alpha$-shape can be added to the plot by specifying the argument `do.shape = TRUE`. Moreover, the Delaunay triangulation and the Voronoi diagram can be added to the plot by specifying the argument `wlines` (`wlines = "del"` for the Delaunay triangulation, `wlines = "vor"` for the Voronoi diagram or `wlines = "both"` for both plots). As an example, we have applied the function `ahull` to a uniform sample of size $n=200$ on the annulus with outer radius $0.5$ and inner radius $0.25$. The result is assigned to the object `alphahull`.
+
+```{r chunk-11, results='hide', fig.show='hide'}
+n <- 200
+theta<-runif(n,0,2*pi)
+r<-sqrt(runif(n,0.25^2,0.5^2))
+x<-cbind(0.5+r*cos(theta),0.5+r*sin(theta))
+alpha <- 0.15
+alphahull <- ahull(x, alpha = alpha)
+```
+
+```{r chunk-12}
+names(alphahull)
+alphahull$complement[1:5,1:3]
+alphahull$arcs[1:5,]
+alphahull$length
+```
+
+A plot of the $\alpha$-convex hull may be obtained as follows. The result is displayed in Figure [9](#fig-ahull2).
+
+```{r chunk-13, results='hide', fig.show='hide'}
+plot(alphahull, col = c(6, rep(1, 5)), xlab = "x-coordinate",ylab = "y-coordinate", main = expression(paste(alpha, "-hull")))
+```
+
+<span id="fig-ahull2"></span>
+
+```{r fig-ahull2, echo=FALSE, fig.width=6, fig.height=4.5, out.width='95%', fig.align='center'}
+par(mfrow=c(1,1))
+plot(alphahull,col=c(6,rep(1,5)), xlab = "x-coordinate",ylab = "y-coordinate", main = expression(paste(alpha, "-hull")),asp=1)
+
+```
+
+*Figure 9. Plot of the $\alpha$-convex hull of a uniform random sample of size $n=200$ on the annulus with outer radius $0.5$ and inner radius $0.25$. The value of  $\alpha$ is $0.15$.*
+
+The plot of the $\alpha$-convex hull together with some of the balls of radius $\alpha$ that define its complement, see Equation ([2](#eq-JLc)), is displayed in the left-hand side of Figure [10](#fig-ahull3). This plot is obtained by using the information of the component `arcs` as shown in the following code. The function `arc` included in the library plots an arc given its center, radius, initial angle and final angle.
+
+```{r chunk-14, results='hide', fig.show='hide'}
+plot(alphahull, col = c(6, rep(1, 5)), xlab = "x-coordinate", ylab = "y-coordinate", main = expression(paste(alpha, "-hull")))
+warcs<- which(alphahull$arcs[,3]>0)
+for (i in warcs) {
+arc(alphahull$arcs[i, 1:2], alphahull$arcs[i,3], c(0,1), pi, col = "gray", lty = 2)
+}
+```
+
+The relation between the $\alpha$-convex hull and the $\alpha$-shape is shown in the right-hand side of Figure [10](#fig-ahull3). In order to plot both the $\alpha$-convex hull and the $\alpha$-shape, specify the parameter `do.shape = TRUE` as in the following code.
+
+```{r chunk-15, results='hide', fig.show='hide'}
+plot(alphahull, do.shape = TRUE, col = c(6, 4, rep(1, 4)), xlab = "x-coordinate", ylab = "y-coordinate", main = expression(paste(alpha, "-hull and ",alpha, "-shape")))
+```
+
+<span id="fig-ahull3"></span>
+
+```{r fig-ahull3, echo=FALSE, fig.width=12, fig.height=6, out.width='95%', fig.align='center'}
+par(mfrow=c(1,2))
+plot(alphahull, col = c(6, rep(1, 5)), xlab = "x-coordinate", ylab = "y-coordinate", main = expression(paste(alpha, "-hull")))
+warcs<- which(alphahull$arcs[,3]>0)
+for (i in warcs) {
+arc(alphahull$arcs[i, 1:2], alphahull$arcs[i,3], c(0,1), 2 * pi, col = "gray", lty = 2)
+}
+plot(alphahull, do.shape = TRUE, col = c(6, 4, rep(1, 4)),xlab = "x-coordinate", ylab = "y-coordinate",main = expression(paste(alpha, "-hull and ",alpha, "-shape")))
+```
+
+*Figure 10. Left: plot of the $\alpha$-convex hull and balls defining the complement. Right: plot of the $\alpha$-convex hull (in pink) and $\alpha$-shape (in blue).*
+
+Once $C_\alpha(\mathcal{X}_n)^c$ is constructed we can decide whether a given point $p\in\mathbb{R}^2$ belongs to the $\alpha$-convex hull or not, by checking if it belongs to any of the open balls or halfplanes that form the complement of the $\alpha$-convex hull. The function `inahull` returns a logical value specifying whether $p$ belongs to $C_\alpha(\mathcal{X}_n)^c$. The function `areahull` returns the area of the $\alpha$-convex hull.  The idea behind this function is that, by joining the end points of adjacent arcs in the boundary of the $\alpha$-convex hull, we can define polygons that help us to determine the area of the estimator. 
+
+# 4. Conclusions {#sec5}
+In this document we have described the implementation in R of the $\alpha$-convex hull and of the $\alpha$-shape of a random sample of points in the plane. The package `alphahull` is the result of that implementation, which is based on efficient algorithms presented by [@Edels83]. The $\alpha$-convex hull and the $\alpha$-shape generalize the notion of convex hull and serve to characterize the shape of an unknown set based on random sample of points taken into it. The results obtained by [@Rodriguez06] on the behaviour of the $\alpha$-convex hull estimator give us the theoretical basis for using this geometrical construct as a support estimator.
+
+**Version 3.0.1.** This vignette updates the presentation in [@alphahull] to reflect the implementation of `alphahull` 3.0.1. Whereas earlier versions used the `interp` package for Delaunay triangulation, version 3.0.1 uses `geometry::delaunayn()` (Qhull) and revises the construction of Voronoi edges, including the outward orientation of unbounded Voronoi rays. To preserve backward compatibility, the `tri.obj` component in objects returned by `delvor()` retains a structure compatible with the `triSht` objects previously provided by `interp`, including triangle connectivity, circumcircle information, and convex hull indices. These implementation changes do not alter the mathematical definitions of the $\alpha$-convex hull or the $\alpha$-shape.

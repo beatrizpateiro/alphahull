@@ -1,34 +1,66 @@
 \name{delvor}
 \alias{delvor}
-%- Also NEED an '\alias' for EACH other topic documented here.
-\title{ Delaunay triangulation and Voronoi diagram}
+\title{Delaunay triangulation and Voronoi diagram}
 \description{
-   This function returns a matrix with information about the Delaunay triangulation and Voronoi diagram of a given sample. 
+   This function returns a list containing the Delaunay triangulation
+   and Voronoi diagram of a given planar sample.
 }
 \usage{
 delvor(x, y = NULL)
 }
-%- maybe also 'usage' for other objects documented here.
 \arguments{
-   \item{x, y}{The \code{x} and \code{y} arguments provide the \code{x} and \code{y} coordinates of a set of points. Alternatively, a single argument \code{x} can be provided, see Details.}
+   \item{x, y}{The \code{x} and \code{y} arguments provide the coordinates
+   of a set of planar points. Alternatively, a single argument \code{x}
+   can be provided, see Details.}
 }
 \details{
-An attempt is made to interpret the arguments x and y in a way suitable for computing the Delaunay triangulation and Voronoi diagram . Any reasonable way of defining the coordinates is acceptable, see \code{\link{xy.coords}}. 
+The coordinates are obtained using \code{\link[grDevices]{xy.coords}}.
+At least three non-collinear points are required.
 
-The function \code{\link[interp]{tri.mesh}} from package \pkg{interp} calculates the Delaunay triangulation of at least three non-collinear points. Using the Delaunay triangulation, the function \code{delvor} calculates the correspondig Voronoi diagram. For each edge of the Delaunay triangulation there is a segment in the Voronoi diagram, given by the union of the circumcenters of the two neighbour triangles that share the edge. For those triangles with edges on the convex hull, the corresponding line in the Voronoi diagram is a semi-infinite segment, whose boundless extreme is calculated by the function \code{\link{dummycoor}}. The function \code{delvor} returns the sample, the output object of class \code{"triSht"} from the function \code{\link[interp]{tri.mesh}} and a matrix \code{mesh} with all the necessary information of the Delaunay triangulation and Voronoi diagram. Thus, for each edge of the Delaunay triangulation the output matrix contains the indexes and coordinates of the sample points that form the edge, the indexes and coordinates of the extremes of the corresponding segment in the Voronoi diagram, and an indicator that takes the value 1 for those extremes of the Voronoi diagram that represent a boundless extreme.
+The Delaunay triangulation is computed with
+\code{\link[geometry]{delaunayn}} from the \pkg{geometry} package,
+which uses Qhull. The corresponding Voronoi diagram is reconstructed
+from the triangle incidences and circumcentres. For an interior Delaunay
+edge, its dual Voronoi edge joins the circumcentres of the two adjacent
+triangles.
+
+For a Delaunay edge on the convex hull, the dual Voronoi edge is
+semi-infinite. The function \code{\link{dummycoor}} supplies fictitious
+coordinates along the outward-pointing ray for plotting; these are not
+additional Voronoi vertices. Its direction is determined using the
+sample centroid.
+
+The matrix \code{mesh} contains one row for each Delaunay edge:
+\code{ind1}, \code{ind2} are its sample-point indices;
+\code{x1}, \code{y1}, \code{x2}, \code{y2} are its endpoint coordinates;
+\code{mx1}, \code{my1}, \code{mx2}, \code{my2} are the coordinates of
+the corresponding Voronoi edge endpoints; and \code{bp1}, \code{bp2}
+identify fictitious endpoints of unbounded Voronoi rays.
 }
 \value{
-   A list with the following components:
-\item{mesh}{A \eqn{n.edges}-row matrix, where \eqn{n.edges} is the total number of different edges of the Delaunay triangulation.}
-  \item{x}{A 2-column matrix with the coordinates of the sample points.}
-    \item{tri.obj}{Object of class \code{"tri"}. See \code{\link[interp]{tri.mesh}} in package \pkg{interp}.}
+   A list of class \code{"delvor"} with the following components:
+   \item{mesh}{A twelve-column matrix with one row for each distinct
+   Delaunay edge and its dual Voronoi edge.}
+   \item{x}{A two-column matrix with the coordinates of the sample points.}
+   \item{tri.obj}{An object of class \code{"triSht"} containing the
+   Delaunay triangulation and associated geometric information.
+   Its components include \code{trlist}, a matrix containing the
+   triangle vertices, neighbouring triangles and edge indices;
+   \code{cclist}, containing circumcircle information;
+   \code{chull}, containing the indices of the convex hull vertices;
+   and \code{arcs}, containing the Delaunay edges.
+   This structure is retained for backward compatibility.}
 }
-\references{Renka, R. J. (1996). Algorithm 751: TRIPACK: a constrained two-dimensional Delaunay triangulation package, \emph{ACM Trans. Math. Softw.}, 22(1), pp.1-8.}
+\references{
+Barber, C. B., Dobkin, D. P. and Huhdanpaa, H. (1996).
+The Quickhull algorithm for convex hulls.
+\emph{ACM Transactions on Mathematical Software}, 22(4), pp. 469--483.
+}
 \seealso{\code{\link{plot.delvor}}.}
 \examples{
 \dontrun{
 # Random sample in the unit square
-x <- matrix(runif(20), nc = 2)
+x <- matrix(runif(20), ncol = 2)
 # Delaunay triangulation and Voronoi diagram calculation
 delvor.obj <- delvor(x)
 }

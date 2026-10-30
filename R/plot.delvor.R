@@ -3,7 +3,7 @@ function (x, add = FALSE, wlines = c("both", "del", "vor"), wpoints = TRUE,
     number = FALSE, col = NULL, xlim = NULL, ylim = NULL, ...) 
 {
     wlines <- match.arg(wlines)
-    if (is.null(class(x)) || class(x) != "delvor") {
+    if (is.null(class(x)) || !inherits(x, "delvor")) {
         cat("Argument is not of class delvor.\n")
         return(invisible())
     }
@@ -45,7 +45,8 @@ function (x, add = FALSE, wlines = c("both", "del", "vor"), wpoints = TRUE,
         }
     }
     if (plot.del) {
-        plot(x$tri.obj, add = TRUE, do.points = FALSE, col = col[2], 
-            ...)
+        mesh <- x$mesh
+        segments(mesh[, "x1"], mesh[, "y1"], mesh[, "x2"],
+            mesh[, "y2"], col = col[2], ...)
     }
 }
